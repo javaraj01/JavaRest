@@ -2,6 +2,8 @@ package com.example.crud.service;
 
 import com.example.crud.entity.ApprovalQueue;
 import com.example.crud.entity.Product;
+import com.example.crud.exception.InvalidRequestException;
+import com.example.crud.exception.NoSuchProductExistException;
 import com.example.crud.repository.ApprovalQueueRepository;
 import com.example.crud.repository.ProductRepository;
 import org.apache.velocity.exception.ResourceNotFoundException;
@@ -9,11 +11,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -28,7 +28,10 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public Product saveProduct(Product product) {
         ApprovalQueue appQueue = new ApprovalQueue();
-
+        if(product.getProductName()==null){
+            throw new InvalidRequestException(
+                    "Enter Valid Request Attribute ProductName!!");
+        }
         Product product1 = productRepository.save(product);
         if(product.getPrice()>5000 && product.getPrice()<10000) {
             appQueue.setProductName(product1.getProductName());
@@ -43,6 +46,10 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public List<Product> fetchAllProducts() {
         List<Product> allProducts = productRepository.findAll();
+        if(allProducts.isEmpty()) {
+            throw new NoSuchProductExistException(
+                    "Product List not Available!!");
+        }
         return allProducts;
     }
 
@@ -50,23 +57,33 @@ public class ProductServiceImpl implements ProductService {
     public List<Product> searchProducts(String productName, float price, String status) {
         List<Product> allProducts = productRepository.findAll();
         List<Product> filteredProd = new ArrayList<>();
-        if(productName!=null) {
-            List<Product> filteredName = allProducts.stream()
-                    .filter(p -> p.getProductName().equalsIgnoreCase(productName))
-                    .collect(Collectors.toList());
-            filteredProd.addAll(filteredName);
-        }
-        if(price!=0) {
-            List<Product> filterePrice = allProducts.stream()
-                    .filter(p -> p.getPrice() == (price))
-                    .collect(Collectors.toList());
-            filteredProd.addAll(filterePrice);
-        }
-        if(status!=null) {
-            List<Product> filtereStatus = allProducts.stream()
-                    .filter(p -> p.getStatus().equalsIgnoreCase(status))
-                    .collect(Collectors.toList());
-            filteredProd.addAll(filtereStatus);
+        try {
+            if (allProducts == null) {
+                throw new NoSuchProductExistException(
+                        "Product List not Available!!");
+            }
+
+            if (productName != null) {
+                List<Product> filteredName = allProducts.stream()
+                        .filter(p -> p.getProductName().equalsIgnoreCase(productName) && p.getProductName() != null)
+                        .collect(Collectors.toList());
+                filteredProd.addAll(filteredName);
+            }
+            if (price != 0) {
+                List<Product> filterePrice = allProducts.stream()
+                        .filter(p -> p.getPrice() == (price))
+                        .collect(Collectors.toList());
+                filteredProd.addAll(filterePrice);
+            }
+            if (status != null) {
+                List<Product> filtereStatus = allProducts.stream()
+                        .filter(p -> p.getStatus().equalsIgnoreCase(status))
+                        .collect(Collectors.toList());
+                filteredProd.addAll(filtereStatus);
+            }
+        }catch ( NoSuchProductExistException ex){
+            throw new NoSuchProductExistException(
+                    "Product List not Available!!");
         }
         return filteredProd;
     }
@@ -104,6 +121,11 @@ public class ProductServiceImpl implements ProductService {
     public ResponseEntity<?> deleteProductById(Long id) {
         ResponseEntity<?> responseEntity = null;
         Optional<Product> product1 = productRepository.findById(id);
+        if(product1.isEmpty()){
+            throw new NoSuchProductExistException(
+                    "No such Product!!");
+        }
+
         ApprovalQueue approvalQueue = new ApprovalQueue();
         try {
             if (product1.isPresent()) {
